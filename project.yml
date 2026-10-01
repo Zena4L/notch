@@ -1,0 +1,82 @@
+# Generates Notch.xcodeproj. Run `xcodegen` after adding or removing files.
+name: Notch
+options:
+  bundleIdPrefix: com.clementbogyah
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    # Everything runs on the main thread unless we say otherwise — right for a UI app.
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+
+targets:
+  Notch:
+    type: application
+    platform: macOS
+    sources: [Notch]
+    info:
+      path: Notch/Info.plist
+      properties:
+        CFBundleDisplayName: Notch
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSApplicationCategoryType: public.app-category.utilities
+        LSUIElement: true # no Dock icon, no app menu
+        NSHumanReadableCopyright: "Free and open source under GPL-3.0"
+        CFBundleURLTypes:
+          - CFBundleURLName: com.clementbogyah.Notch
+            CFBundleURLSchemes: [notch]
+        NSLocationUsageDescription: "Notch uses your approximate location for the weather widget. It's rounded to about 1 km."
+        NSLocationWhenInUseUsageDescription: "Notch uses your approximate location for the weather widget. It's rounded to about 1 km."
+        NSCalendarsFullAccessUsageDescription: "Notch reads your calendars to show upcoming events. Nothing leaves your Mac."
+        NSCalendarsUsageDescription: "Notch reads your calendars to show upcoming events. Nothing leaves your Mac."
+    entitlements:
+      path: Notch/Notch.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.personal-information.calendars: true # required with Hardened Runtime
+        com.apple.security.personal-information.location: true # weather widget, only if turned on
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.clementbogyah.Notch
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-" # ad-hoc signing for local builds
+        ENABLE_USER_SCRIPT_SANDBOXING: NO # the embed script reads from Vendor/
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon # drawn by scripts/make-icon.swift
+    postBuildScripts:
+      # Bundled but not linked: NowPlayingService runs it through /usr/bin/perl.
+      - name: Embed MediaRemoteAdapter
+        basedOnDependencyAnalysis: false
+        script: |
+          DEST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/MediaRemoteAdapter"
+          rm -rf "$DEST" && mkdir -p "$DEST"
+          cp -R "$SRCROOT/Vendor/MediaRemoteAdapter/MediaRemoteAdapter.framework" \
+                "$SRCROOT/Vendor/MediaRemoteAdapter/mediaremote-adapter.pl" "$DEST/"
+
+  NotchTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [NotchTests]
+    dependencies:
+      - target: Notch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.clementbogyah.NotchTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Notch.app/Contents/MacOS/Notch"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  Notch:
+    build:
+      targets:
+        Notch: all
+        NotchTests: [test]
+    test:
+      targets: [NotchTests]
