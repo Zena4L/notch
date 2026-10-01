@@ -21,6 +21,23 @@ Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of 
 | **Battery** | Peeks when you plug in, unplug or run low. |
 | **Settings** | Almost everything is configurable, including the island's look, which activities show, shortcuts and `notch://` links. |
 
+## Download
+
+Get the latest **Notch-x.y.z.dmg** from the [Releases page](https://github.com/Zena4L/notch/releases/latest).
+
+1. Open the DMG and drag **Notch** into **Applications**.
+2. Open Notch. macOS will say it can't verify the developer. Click **Done**.
+3. Open **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to Notch.
+
+You only need step 3 once. It's required because Notch isn't signed with a paid Apple
+Developer ID yet. If you'd rather use Terminal, run this instead:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Notch.app
+```
+
+To update, download the new DMG and replace the app in Applications.
+
 ## Requirements
 
 - A Mac with a notch (MacBook Pro 14″/16″ 2021 or later, MacBook Air 2022 or later).
@@ -29,7 +46,7 @@ Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of 
 - Xcode 26 or later to build (developed with Xcode 27).
 - [Homebrew](https://brew.sh), used for XcodeGen and, optionally, the download tools.
 
-## Setup
+## Building from source
 
 1. **Install XcodeGen.** It generates the Xcode project from `project.yml`.
 
@@ -140,12 +157,26 @@ xcodebuild -project Notch.xcodeproj -scheme Notch test
 | `Notch/Settings` | The Settings window and `SettingsStore` |
 | `Notch/Window` | The notch panel, hover zones, multi-display and full-screen handling |
 | `NotchTests` | Unit tests |
+| `.github/workflows` | CI (tests on every push) and Release (DMG on every version tag) |
 | `Vendor/MediaRemoteAdapter` | Prebuilt helper for reading Now Playing on macOS 15.4+ |
-| `scripts/` | `make-icon.swift` (draws the app icon), `build-mediaremote-adapter.sh` (rebuilds the helper) |
+| `scripts/` | `release.sh` (builds the DMG), `make-icon.swift` (draws the app icon), `build-mediaremote-adapter.sh` (rebuilds the helper) |
 
 Since macOS 15.4, only Apple-entitled processes can read Now Playing information directly.
 Notch runs the bundled helper through the system's `/usr/bin/perl`, which is allowed to.
 A small watchdog makes sure the helper stops whenever Notch does.
+
+### Releasing
+
+GitHub Actions builds and tests every push to `main`. To publish a release, push a version tag:
+
+```sh
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+The [Release workflow](.github/workflows/release.yml) runs the tests, builds
+`Notch-1.2.0.dmg` with `scripts/release.sh`, and publishes it on the Releases page with
+install notes. To build the DMG locally instead, run `scripts/release.sh 1.2.0`.
 
 ## Acknowledgements
 

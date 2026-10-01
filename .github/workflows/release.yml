@@ -1,0 +1,61 @@
+# Push a version tag to publish a release:
+#   git tag v1.2.0 && git push origin v1.2.0
+# This runs the tests, builds Notch-1.2.0.dmg and attaches it to a new GitHub Release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # create the release and upload the DMG
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the build number is the commit count
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Test
+        run: |
+          xcodegen --quiet
+          xcodebuild -project Notch.xcodeproj -scheme Notch -derivedDataPath build/test test \
+            | grep -E "error:|✘|Test run|\*\* TEST"
+
+      - name: Build DMG
+        run: scripts/release.sh "$GITHUB_REF_NAME"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > notes.md <<NOTES
+          ## Install
+
+          1. Download **Notch-$VERSION.dmg** below, open it, and drag **Notch** into **Applications**.
+          2. Open Notch. macOS will say it can't verify the developer — click **Done**.
+          3. Open **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to Notch.
+
+          Notch isn't signed with a paid Apple Developer ID yet, which is why step 3 is needed (once).
+          Prefer Terminal? \`xattr -dr com.apple.quarantine /Applications/Notch.app\`
+
+          Requires a Mac running macOS 14 or later. Best on MacBooks with a notch.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" \
+            "build/release/Notch-$VERSION.dmg" "build/release/Notch-$VERSION.dmg.sha256" \
+            --title "Notch $VERSION" --notes-file notes.md --generate-notes
