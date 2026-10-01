@@ -23,6 +23,21 @@ Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of 
 
 ## Download
 
+### Quick install (recommended)
+
+Paste this into **Terminal**. It downloads the latest release, installs Notch into
+Applications and opens it:
+
+```sh
+curl -fsSL https://api.github.com/repos/Zena4L/notch/releases/latest | grep -o 'https://[^"]*\.dmg' | head -1 | xargs curl -fL --progress-bar -o /tmp/Notch.dmg && MNT=$(mktemp -d) && hdiutil attach -nobrowse -quiet -mountpoint "$MNT" /tmp/Notch.dmg && ditto "$MNT/Notch.app" /Applications/Notch.app && hdiutil detach -quiet "$MNT" && rm /tmp/Notch.dmg && open /Applications/Notch.app
+```
+
+Files downloaded with `curl` aren't marked as coming from the internet, so macOS opens
+Notch straight away, without the "could not verify" warning. To update, quit Notch and run
+the same command again.
+
+### Download the DMG
+
 Get the latest **Notch-x.y.z.dmg** from the [Releases page](https://github.com/Zena4L/notch/releases/latest).
 
 1. Open the DMG and drag **Notch** into **Applications**.
