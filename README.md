@@ -43,7 +43,7 @@ To update, download the new DMG and replace the app in Applications.
 - A Mac with a notch (MacBook Pro 14″/16″ 2021 or later, MacBook Air 2022 or later).
   On other displays the island slides down from the menu bar instead.
 - macOS 14 Sonoma or later. Liquid Glass materials need macOS 26 or later.
-- Xcode 26 or later to build (developed with Xcode 27).
+- Xcode 27 or later to build.
 - [Homebrew](https://brew.sh), used for XcodeGen and, optionally, the download tools.
 
 ## Building from source
