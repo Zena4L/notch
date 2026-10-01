@@ -25,16 +25,28 @@ Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of 
 
 ### Quick install (recommended)
 
-Paste this into **Terminal**. It downloads the latest release, installs Notch into
-Applications and opens it:
+Paste this into **Terminal**:
 
 ```sh
-curl -fsSL https://api.github.com/repos/Zena4L/notch/releases/latest | grep -o 'https://[^"]*\.dmg' | head -1 | xargs curl -fL --progress-bar -o /tmp/Notch.dmg && MNT=$(mktemp -d) && hdiutil attach -nobrowse -quiet -mountpoint "$MNT" /tmp/Notch.dmg && ditto "$MNT/Notch.app" /Applications/Notch.app && hdiutil detach -quiet "$MNT" && rm /tmp/Notch.dmg && open /Applications/Notch.app
+curl -fsSL https://raw.githubusercontent.com/Zena4L/notch/HEAD/scripts/install.sh | bash
 ```
 
+The [installer](scripts/install.sh) downloads the latest release, checks it against its
+SHA-256 checksum, installs Notch into Applications and opens it. Run the same command again
+to update; it quits the running Notch first.
+
 Files downloaded with `curl` aren't marked as coming from the internet, so macOS opens
-Notch straight away, without the "could not verify" warning. To update, quit Notch and run
-the same command again.
+Notch straight away, without the "could not verify" warning.
+
+You can set these options before `bash`:
+
+| Option | Example | Effect |
+|---|---|---|
+| `NOTCH_VERSION` | `NOTCH_VERSION=1.0.0` | Install a specific version |
+| `NOTCH_INSTALL_DIR` | `NOTCH_INSTALL_DIR=~/Applications` | Install somewhere else (the installer falls back to `~/Applications` by itself if it can't write to `/Applications`) |
+| `NOTCH_NO_OPEN` | `NOTCH_NO_OPEN=1` | Don't open Notch after installing |
+
+For example: `curl -fsSL https://raw.githubusercontent.com/Zena4L/notch/HEAD/scripts/install.sh | NOTCH_VERSION=1.0.0 bash`
 
 ### Download the DMG
 
@@ -174,7 +186,7 @@ xcodebuild -project Notch.xcodeproj -scheme Notch test
 | `NotchTests` | Unit tests |
 | `.github/workflows` | CI (tests on every push) and Release (DMG on every version tag) |
 | `Vendor/MediaRemoteAdapter` | Prebuilt helper for reading Now Playing on macOS 15.4+ |
-| `scripts/` | `release.sh` (builds the DMG), `make-icon.swift` (draws the app icon), `build-mediaremote-adapter.sh` (rebuilds the helper) |
+| `scripts/` | `install.sh` (the one-line installer), `release.sh` (builds the DMG), `make-icon.swift` (draws the app icon), `build-mediaremote-adapter.sh` (rebuilds the helper) |
 
 Since macOS 15.4, only Apple-entitled processes can read Now Playing information directly.
 Notch runs the bundled helper through the system's `/usr/bin/perl`, which is allowed to.
