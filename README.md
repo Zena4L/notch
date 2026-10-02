@@ -1,8 +1,8 @@
 # Notch
 
 A native Dynamic Island for the MacBook notch. Notch turns the camera housing into a live,
-interactive island: music, timers, downloads, meetings, system stats and more, without
-getting in your way.
+interactive island: music, timers, downloads, notifications, meetings, system stats and
+more, without getting in your way.
 
 Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of memory and
 **~0% CPU** while you work.
@@ -38,7 +38,7 @@ See the [releases page](https://github.com/Zena4L/notch/releases) for details.
 | **Now Playing** | Album art, a waveform tinted by the artwork, a progress bar you can scrub, and playback controls. Works with Music, Spotify, browsers and Podcasts. |
 | **Lyrics** | Synced lyrics that follow the song (click a line to jump to it), from [LRCLIB](https://lrclib.net). Open them with the 💬 button in the player. |
 | **Timers** | Countdown and stopwatch, with a split bubble when two things are running at once. |
-| **Downloads** | Paste a link from X, YouTube or 1,000+ other sites to save the video or audio (via yt-dlp), or a link to any file. Downloads from Safari, Chrome, Brave, Edge and Arc show their progress in the notch automatically, and you can cancel them there. With the optional [browser extension](Extension/README.md), Notch does the downloading itself. Drag files out, AirDrop or share them. |
+| **Downloads** | Paste a link from X, YouTube or 1,000+ other sites to save the video or audio (via yt-dlp, set up with one click), or a link to any file. Downloads from Safari, Chrome, Brave, Edge and Arc show their progress in the notch automatically, and you can cancel them there. With the optional [browser extension](Extension/README.md), Notch does the downloading itself. Drag files out, AirDrop or share them. |
 | **Dashboard** | Widgets for CPU, memory, storage, network, battery, weather, today's events and clipboard history. |
 | **Notifications** | WhatsApp, Slack, Teams, Mail and more show under the notch. Reply, use the app's own buttons (Mark as Read, Archive…) or dismiss them without opening the app, and find recent ones in the Notifications tab. Optional, needs Accessibility. |
 | **Calendar** | A reminder before meetings, with a **Join** button for Zoom, Google Meet and Teams links. |
@@ -132,6 +132,11 @@ To update, download the new DMG and replace the app in Applications.
 > Run `xcodegen` again whenever you add or remove source files. Edits to existing files
 > only need ⌘R.
 
+## Using Notch
+
+- **Hover** the notch to expand the island. Move away, or press **Esc**, to close it.
+- **Click** the menu bar icon for Settings and Quit.
+
 ### Download tools
 
 Video downloads need three free tools: [yt-dlp](https://github.com/yt-dlp/yt-dlp),
@@ -150,11 +155,6 @@ Settings switches to Notch's set, which includes Deno.
 
 Only download videos you have the right to keep. Some sites' terms, including YouTube's,
 restrict downloading. Links straight to a file (a PDF, a zip, a DMG…) don't need these tools.
-
-## Using Notch
-
-- **Hover** the notch to expand the island. Move away, or press **Esc**, to close it.
-- **Click** the menu bar icon for Settings and Quit.
 
 ### Browser downloads
 
@@ -263,7 +263,7 @@ xcodebuild -project Notch.xcodeproj -scheme Notch test
 |---|---|
 | `Notch/App` | App entry point, menu bar, shortcuts, `notch://` links |
 | `Notch/Island` | The island's views and the state model (`IslandState`, `IslandCoordinator`) |
-| `Notch/Services` | Now Playing, timers, battery, calendar, downloads, lyrics, weather, stats, HUD |
+| `Notch/Services` | Now Playing, timers, battery, calendar, downloads (and the tool installer, browser watcher and extension bridge), notifications, lyrics, weather, stats, HUD |
 | `Notch/Settings` | The Settings window and `SettingsStore` |
 | `Notch/Window` | The notch panel, hover zones, multi-display and full-screen handling |
 | `NotchTests` | Unit tests |
@@ -286,8 +286,13 @@ git push origin v1.2.0
 ```
 
 The [Release workflow](.github/workflows/release.yml) runs the tests, builds
-`Notch-1.2.0.dmg` with `scripts/release.sh`, and publishes it on the Releases page with
-install notes. To build the DMG locally instead, run `scripts/release.sh 1.2.0`.
+`Notch-1.2.0.dmg` and `Notch-Extension-1.2.0.zip` with `scripts/release.sh`, and publishes
+them on the Releases page with install notes. If the release already exists (say, the tag
+was pushed again), it replaces the files instead. To build locally, run
+`scripts/release.sh 1.2.0`.
+
+The tools Notch sets up for video downloads are pinned in `ToolInstaller.standardAssets`
+(FFmpeg and Deno, with their SHA-256 checksums). yt-dlp always follows its latest release.
 
 ## Acknowledgements
 
