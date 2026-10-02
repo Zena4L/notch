@@ -175,9 +175,29 @@ final class BrowserDownloadWatcher {
     // MARK: Watching the folder
 
     private func watchFolder() {
-        knownNames = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
-        let fd = open(folder.path, O_EVTONLY)
-        guard fd >= 0 else { return }
+        let path = folder.path
+        // The first look at Downloads waits while macOS asks for permission; never on the main thread.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let (names, fd) = Self.open(path)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.subscription != nil, self.folderSource == nil, fd >= 0 else {
+                        if fd >= 0 { close(fd) }
+                        return
+                    }
+                    self.knownNames = names
+                    self.watch(fd)
+                }
+            }
+        }
+    }
+
+    nonisolated private static func open(_ path: String) -> (Set<String>, Int32) {
+        let names = Set((try? FileManager.default.contentsOfDirectory(atPath: path)) ?? [])
+        return (names, Darwin.open(path, O_EVTONLY))
+    }
+
+    private func watch(_ fd: Int32) {
         let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
         source.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.folderChanged() }

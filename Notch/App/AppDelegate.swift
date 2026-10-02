@@ -8,8 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Takes over downloads clicked in the browser, through the Notch extension.
     let browserBridge: BrowserBridgeService
     /// Shows downloads the browser makes itself in the island; no extension needed.
-    private let browserWatcher: BrowserDownloadWatcher
+    private let browserWatcher: BrowserDownloadWatcher?
     let hud: HUDService
+    /// Other apps' notifications, in the island.
+    let notifications: NotificationService
     /// Which shortcuts registered successfully, for Settings › Shortcuts.
     let hotkeyStatus = HotkeyStatus()
 
@@ -24,15 +26,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         calendar = CalendarService(settings: settings)
         downloads = DownloadService(settings: settings)
         browserBridge = BrowserBridgeService(settings: settings, downloads: downloads)
-        browserWatcher = BrowserDownloadWatcher(settings: settings, downloads: downloads)
+        // Not while unit tests run: reading ~/Downloads would stop them for a permission prompt.
+        let testing = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        browserWatcher = testing ? nil : BrowserDownloadWatcher(settings: settings, downloads: downloads)
         hud = HUDService(settings: settings)
+        notifications = NotificationService(settings: settings)
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         displayManager = DisplayManager(
             settings: settings, battery: battery, timers: timers,
-            nowPlaying: nowPlaying, downloads: downloads, calendar: calendar
+            nowPlaying: nowPlaying, downloads: downloads, calendar: calendar,
+            notifications: notifications
         )
         hud.onChange = { [weak self] kind, level, muted in self?.displayManager?.showLevel(kind, level, muted: muted) }
         registerShortcuts()

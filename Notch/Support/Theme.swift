@@ -46,7 +46,7 @@ nonisolated enum Motion {
     /// States that hang below the menu bar: the expanded island and the taller peeks.
     private static func dropsDown(_ state: IslandState) -> Bool {
         switch state {
-        case .expanded, .peek(.trackChange), .peek(.meeting), .peek(.downloadDone), .peek(.downloadFailed): true
+        case .expanded, .peek(.trackChange), .peek(.meeting), .peek(.downloadDone), .peek(.downloadFailed), .peek(.notification): true
         default: false
         }
     }

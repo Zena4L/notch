@@ -92,11 +92,7 @@ struct ActivitiesPane: View {
                     Text("Shows which Focus is on · coming in a later version")
                 }
                 .disabled(true)
-                Toggle(isOn: .constant(false)) {
-                    Text("Notifications · Experimental")
-                    Text("Mirrors banners into the island · coming in a later version")
-                }
-                .disabled(true)
+                NotificationPermissionRows()
             }
         }
         .formStyle(.grouped)
@@ -431,7 +427,7 @@ private struct DownloadsSettings: View {
                 Toggle("Show a peek when a download finishes", isOn: $settings.downloadPeek)
                 Toggle(isOn: $settings.autoUpdateDownloader) {
                     Text("Keep yt-dlp up to date")
-                    Text("Sites change often; checks at most once a day, via Homebrew")
+                    Text("Sites change often; checks at most once a day, never during a download")
                 }
             }
         } header: {
@@ -445,31 +441,53 @@ private struct DownloadsSettings: View {
     @ViewBuilder
     private var toolsRow: some View {
         let tools = downloads.tools
+        let installer = downloads.installer
         LabeledContent {
-            switch downloads.toolTask {
-            case .running(let title, _):
+            if installer.phase == .running {
+                HStack(spacing: 6) {
+                    ProgressView(value: installer.fraction).frame(width: 80)
+                    Button("Cancel") { installer.cancel() }
+                }
+            } else if case .running(let title, _) = downloads.toolTask {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
                     Text(title).foregroundStyle(.secondary)
                 }
-            default:
-                if tools.isReady {
-                    Button("Update Now") { downloads.updateTools() }
-                        .disabled(tools.brew == nil)
-                } else if tools.brew != nil {
-                    Button("Install with Homebrew") { downloads.installTools() }
-                        .buttonStyle(.borderedProminent)
-                } else {
-                    Link("Get Homebrew…", destination: URL(string: "https://brew.sh")!)
+            } else if installer.isUpdating {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Updating yt-dlp…").foregroundStyle(.secondary)
                 }
+            } else if tools.isReady {
+                HStack {
+                    Button("Update Now") { downloads.updateTools() }
+                        .disabled(!tools.isManaged && tools.brew == nil)
+                    if !tools.isManaged {
+                        Button("Use Notch's Own") { downloads.installTools() }
+                            .help("Sets up Notch's own yt-dlp, FFmpeg and Deno, which it keeps up to date")
+                    }
+                    if installer.isInstalled {
+                        Button("Remove") { installer.remove() }
+                    }
+                }
+            } else {
+                Button("Set Up") { downloads.installTools() }
+                    .buttonStyle(.borderedProminent)
             }
         } label: {
-            Text("yt-dlp and ffmpeg")
-            if case .failed(let message) = downloads.toolTask {
+            Text("Video tools")
+            if case .failed(let message) = installer.phase {
                 Text(message).foregroundStyle(.red)
+            } else if case .failed(let message) = downloads.toolTask {
+                Text(message).foregroundStyle(.red)
+            } else if tools.isReady {
+                Text(tools.isManaged
+                     ? "yt-dlp, FFmpeg and Deno · set up by Notch · \(ByteCountFormatter.string(fromByteCount: installer.diskUsage(), countStyle: .file))"
+                     : "yt-dlp and FFmpeg from Homebrew · Notch's own also adds Deno, for every YouTube format")
+                    .foregroundStyle(.green)
             } else {
-                Text(tools.isReady ? "Installed" : "Not installed — needed for downloads")
-                    .foregroundStyle(tools.isReady ? .green : .orange)
+                Text("Needed for video downloads · one click, about \(ByteCountFormatter.string(fromByteCount: installer.downloadSize, countStyle: .file))")
+                    .foregroundStyle(.orange)
             }
         }
         .onAppear { downloads.refreshTools() }
@@ -588,6 +606,95 @@ private extension FileKind {
         case .installer: "DMG, PKG, ISO"
         case .media: "MP4, MOV, MKV, MP3, M4A, WAV"
         case .other: "Files of any other type"
+        }
+    }
+}
+
+/// Notifications from other apps: the same in-place Accessibility flow as Volume & brightness,
+/// then which apps, and what happens to the macOS banner.
+private struct NotificationPermissionRows: View {
+    @Environment(SettingsStore.self) private var settings
+    @Environment(NotificationService.self) private var notifications
+    @State private var waitingForSettings = false
+    @State private var copied = false
+
+    var body: some View {
+        @Bindable var settings = settings
+
+        Toggle(isOn: $settings.notificationsEnabled) {
+            Text("Notifications")
+            Text("WhatsApp, Slack, Teams, Mail and more in the island: reply, use their buttons or dismiss them without opening the app")
+        }
+        .onChange(of: settings.notificationsEnabled) { _, on in
+            if !on { waitingForSettings = false }
+        }
+
+        if settings.notificationsEnabled {
+            if notifications.isTrusted {
+                Label("Accessibility access granted", systemImage: "checkmark")
+                    .foregroundStyle(.green)
+                    .padding(.leading, 16)
+                Toggle(isOn: $settings.notificationsAllApps) {
+                    Text("From all apps")
+                    Text("Off: only the apps below")
+                }
+                .padding(.leading, 16)
+                if !settings.notificationsAllApps {
+                    ForEach(NotificationService.defaultApps, id: \.self) { app in
+                        Toggle(app, isOn: Binding(
+                            get: { settings.notificationApps.contains(app) },
+                            set: { on in
+                                if on { settings.notificationApps.append(app) } else { settings.notificationApps.removeAll { $0 == app } }
+                            }
+                        ))
+                        .padding(.leading, 32)
+                    }
+                }
+                Toggle(isOn: $settings.notificationsHideBanner) {
+                    Text("Move banners into the notch")
+                    Text("Closes the macOS banner once it's in the island. Banners with Reply or other buttons stay until you use them, because those buttons need it")
+                }
+                .padding(.leading, 16)
+                LabeledContent {
+                    Button(copied ? "Copied" : "Copy Diagnostics") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(notifications.diagnostics(), forType: .string)
+                        copied = true
+                    }
+                } label: {
+                    Text("Something not showing up?")
+                    Text("Copies how your banners look to Notch, to send with a bug report. It can include the text of recent notifications")
+                }
+                .padding(.leading, 16)
+            } else if waitingForSettings {
+                Text("Waiting for Accessibility access. Turn on Notch in the list; this switches on by itself.")
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 16)
+                    .task {
+                        while !notifications.isTrusted, !Task.isCancelled {
+                            try? await Task.sleep(for: .seconds(1))
+                            notifications.refreshTrust()
+                        }
+                        waitingForSettings = false
+                    }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("macOS doesn't let apps read each other's notifications, so Notch reads the banners on screen. That needs Accessibility access. Notifications stay on your Mac and are forgotten when Notch quits.")
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Button("Open System Settings…") {
+                            notifications.requestAccess()
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                                NSWorkspace.shared.open(url)
+                            }
+                            waitingForSettings = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Button("Not now") { settings.notificationsEnabled = false }
+                    }
+                }
+                .padding(.leading, 16)
+            }
         }
     }
 }

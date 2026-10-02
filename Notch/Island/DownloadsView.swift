@@ -18,9 +18,10 @@ struct DownloadsView: View {
             linkBar(downloads)
             // Plain files don't need yt-dlp, so only block the list while a video is waiting for it.
             let needsTools = !downloads.tools.isReady || downloads.toolTask != .idle
-            let videoWaiting = downloads.items.contains { !$0.isDirect && $0.status == .queued }
-            if needsTools && (downloads.items.isEmpty || videoWaiting) {
-                ToolsBanner()
+            let videoWaiting = downloads.items.contains { !$0.isFile && $0.status == .queued }
+            // Setup in progress (or just finished) always shows, wherever it was started.
+            if downloads.installer.phase != .idle || needsTools && (downloads.items.isEmpty || videoWaiting) {
+                ToolsSetup()
             } else if downloads.items.isEmpty {
                 emptyState
             } else {
@@ -403,47 +404,278 @@ private struct ActionLabel: View {
     }
 }
 
-// MARK: - Tools banner
+// MARK: - Tools setup
 
-/// Shown until yt-dlp and ffmpeg are installed, and while Homebrew is working.
-private struct ToolsBanner: View {
+/// Until yt-dlp, FFmpeg and Deno are set up: one button, then each tool's progress, a check as
+/// each one is verified, and a little celebration at the end. Homebrew updates show here too.
+private struct ToolsSetup: View {
     @Environment(IslandCoordinator.self) private var coordinator
 
     var body: some View {
         let downloads = coordinator.downloads
-        VStack(spacing: 8) {
-            switch downloads.toolTask {
-            case .running(let title, let lastLine):
-                ProgressView().controlSize(.small).tint(.white)
-                Text(title).font(.system(size: 12.5, weight: .medium))
-                Text(lastLine).font(.system(size: 10.5, design: .monospaced)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
-            case .failed(let message):
-                Text(message).font(.system(size: 12)).foregroundStyle(Theme.red).multilineTextAlignment(.center)
-                Button("OK") { downloads.dismissToolError() }
-                    .buttonStyle(IslandButtonStyle(cornerRadius: 6, padding: 6))
-            case .idle:
-                Text("Downloads need two free tools: yt-dlp and ffmpeg.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(0.8))
-                if downloads.tools.brew != nil {
-                    Button {
-                        downloads.installTools()
-                    } label: {
-                        Text("Install with Homebrew")
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .padding(.vertical, 6).padding(.horizontal, 14)
-                            .background(Theme.blue, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    Text("Takes a few minutes the first time").font(.system(size: 10.5)).foregroundStyle(.white.opacity(0.45))
-                } else {
-                    Text("Install Homebrew from brew.sh first, then come back.")
-                        .font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.55))
+        let installer = downloads.installer
+        ZStack {
+            if case .running(let title, let lastLine) = downloads.toolTask {
+                VStack(spacing: 6) {
+                    ProgressView().controlSize(.small).tint(.white)
+                    Text(title).font(.system(size: 12.5, weight: .medium))
+                    Text(lastLine).font(.system(size: 10.5, design: .monospaced)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
+                }
+            } else {
+                switch installer.phase {
+                case .idle:
+                    SetupIntro(size: installer.downloadSize) { downloads.installTools() }
+                        .transition(.blurReplace)
+                case .running:
+                    SetupProgress(installer: installer)
+                        .transition(.blurReplace)
+                case .finished:
+                    SetupDone { installer.acknowledge() }
+                        .transition(.blurReplace)
+                case .failed(let message):
+                    SetupFailed(message: message, retry: { downloads.installTools() }, dismiss: { downloads.dismissToolError() })
+                        .transition(.blurReplace)
                 }
             }
         }
+        .animation(.spring(duration: 0.45, bounce: 0.2), value: installer.phase)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
         .onAppear { downloads.refreshTools() }
+    }
+}
+
+private struct SetupIntro: View {
+    let size: Int64
+    let start: () -> Void
+    @State private var float = false
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // The three tools, fanned out like cards.
+            ZStack {
+                ForEach(Array(ToolInstaller.Tool.allCases.enumerated()), id: \.element) { index, tool in
+                    Image(systemName: tool.symbol)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                        .background(Theme.blue.opacity(0.35 + Double(index) * 0.2), in: RoundedRectangle(cornerRadius: 8))
+                        .rotationEffect(.degrees(Double(index - 1) * 12))
+                        .offset(x: CGFloat(index - 1) * 15, y: float ? -2 : 2)
+                        .animation(.easeInOut(duration: 1.6).repeatForever().delay(Double(index) * 0.2), value: float)
+                }
+            }
+            .frame(width: 70)
+            .onAppear { float = true }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Save videos from 1,000+ sites").font(.system(size: 13.5, weight: .semibold))
+                Text("One-time setup · \(ByteCountFormatter.string(fromByteCount: size, countStyle: .file)) · nothing else to install")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+            Spacer(minLength: 8)
+            Button(action: start) {
+                Label("Set Up", systemImage: "sparkles")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .padding(.vertical, 7).padding(.horizontal, 14)
+                    .background(Theme.blue, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 18)
+    }
+}
+
+private struct SetupProgress: View {
+    let installer: ToolInstaller
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                ForEach(ToolInstaller.Tool.allCases) { tool in
+                    ToolChip(tool: tool, part: installer.parts[tool] ?? .init())
+                }
+            }
+            HStack(spacing: 8) {
+                Capsule()
+                    .fill(.white.opacity(0.12))
+                    .overlay(alignment: .leading) {
+                        GeometryReader { geo in
+                            Capsule()
+                                .fill(LinearGradient(colors: [Theme.blue, Theme.green], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: max(6, geo.size.width * installer.fraction))
+                                .animation(.easeOut(duration: 0.4), value: installer.fraction)
+                        }
+                    }
+                    .frame(height: 4)
+                Text(statusLine)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                Button { installer.cancel() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 13)).foregroundStyle(.white.opacity(0.45))
+                }
+                .buttonStyle(.plain)
+                .help("Cancel setup")
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var statusLine: String {
+        let parts = installer.parts.values
+        if parts.contains(where: { $0.step == .preparing }), !parts.contains(where: { $0.step == .downloading }) {
+            return "macOS checks new tools once · almost there"
+        }
+        var line = "\(Int(installer.fraction * 100))%"
+        if let speed = installer.speed, speed > 0 {
+            line += " · \(ByteCountFormatter.string(fromByteCount: Int64(speed), countStyle: .file))/s"
+        }
+        return line
+    }
+}
+
+private struct ToolChip: View {
+    let tool: ToolInstaller.Tool
+    let part: ToolInstaller.Part
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle().fill(part.step == .ready ? Theme.green.opacity(0.25) : .white.opacity(0.08))
+                ring
+                Image(systemName: part.step == .ready ? "checkmark" : part.step == .failed ? "exclamationmark" : tool.symbol)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(part.step == .ready ? Theme.green : .white)
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.bounce, value: part.step == .ready)
+            }
+            .frame(width: 32, height: 32)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(tool.title).font(.system(size: 12, weight: .semibold))
+                Text(status)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(.white.opacity(part.step == .ready ? 0.09 : 0.05), in: RoundedRectangle(cornerRadius: 11))
+        .animation(.spring(duration: 0.4, bounce: 0.3), value: part.step)
+    }
+
+    @ViewBuilder
+    private var ring: some View {
+        switch part.step {
+        case .downloading:
+            ProgressRing(progress: part.total > 0 ? Double(part.received) / Double(part.total) : 0, lineWidth: 2.5, color: Theme.blue)
+        case .verifying, .unpacking, .preparing:
+            Circle()
+                .trim(from: 0, to: 0.3)
+                .stroke(Theme.green, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .modifier(Spinning())
+        default:
+            EmptyView()
+        }
+    }
+
+    private var status: String {
+        switch part.step {
+        case .waiting: "Waiting…"
+        case .downloading:
+            "\(ByteCountFormatter.string(fromByteCount: part.received, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: part.total, countStyle: .file))"
+        case .verifying: "Checking it's genuine…"
+        case .unpacking: "Unpacking…"
+        case .preparing: "Getting ready…"
+        case .ready: tool.role
+        case .failed: "Didn't finish"
+        }
+    }
+}
+
+private struct Spinning: ViewModifier {
+    @State private var angle = 0.0
+
+    func body(content: Content) -> some View {
+        content
+            .rotationEffect(.degrees(angle))
+            .onAppear {
+                withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { angle = 360 }
+            }
+    }
+}
+
+private struct SetupDone: View {
+    let finish: () -> Void
+    @Environment(IslandCoordinator.self) private var coordinator
+    @State private var drawn = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Theme.green.opacity(drawn ? 0.22 : 0)).scaleEffect(drawn ? 1 : 0.4)
+                CheckShape()
+                    .trim(from: 0, to: drawn ? 1 : 0)
+                    .stroke(Theme.green, style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
+                    .padding(11)
+            }
+            .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("You're all set").font(.system(size: 14, weight: .semibold))
+                Text("Paste a link from X, YouTube or 1,000+ other sites")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(duration: 0.6, bounce: 0.35).delay(0.1)) { drawn = true }
+            if coordinator.settings.haptics {
+                NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+            }
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(2.2))
+            finish()
+        }
+    }
+}
+
+nonisolated private struct CheckShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY + rect.height * 0.05))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.38, y: rect.maxY - rect.height * 0.1))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.12))
+        return path
+    }
+}
+
+private struct SetupFailed: View {
+    let message: String
+    let retry: () -> Void
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.red)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 8) {
+                Button("Try Again", action: retry)
+                    .buttonStyle(IslandButtonStyle(cornerRadius: 6, padding: 6))
+                Button("Not Now", action: dismiss)
+                    .buttonStyle(IslandButtonStyle(cornerRadius: 6, padding: 6))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .font(.system(size: 12, weight: .medium))
+        }
+        .padding(.horizontal, 16)
     }
 }

@@ -212,6 +212,13 @@ final class SettingsStore {
     var browserTakeover: Bool = false { didSet { persist("browserTakeover", browserTakeover) } }
     /// File types Notch takes over; the browser keeps the rest.
     var takeoverKinds: Set<FileKind> = Set(FileKind.allCases) { didSet { persist("takeoverKinds", takeoverKinds.map(\.rawValue).sorted()) } }
+    /// Notifications from other apps in the island. Needs Accessibility access.
+    var notificationsEnabled: Bool = false { didSet { persist("notificationsEnabled", notificationsEnabled) } }
+    /// Every app's notifications, rather than only `notificationApps`.
+    var notificationsAllApps: Bool = false { didSet { persist("notificationsAllApps", notificationsAllApps) } }
+    var notificationApps: [String] = NotificationService.defaultApps { didSet { persist("notificationApps", notificationApps) } }
+    /// Close the macOS banner once it's in the island (if it has no buttons that need it).
+    var notificationsHideBanner: Bool = true { didSet { persist("notificationsHideBanner", notificationsHideBanner) } }
     /// Minutes before an event starts that the reminder appears.
     var meetingLeadMinutes: Int = 5 { didSet { persist("meetingLeadMinutes", meetingLeadMinutes) } }
     var meetingAlertAtStart: Bool = false { didSet { persist("meetingAlertAtStart", meetingAlertAtStart) } }
@@ -335,6 +342,10 @@ final class SettingsStore {
         followBrowserDownloads = fresh.followBrowserDownloads
         browserTakeover = fresh.browserTakeover
         takeoverKinds = fresh.takeoverKinds
+        notificationsEnabled = fresh.notificationsEnabled
+        notificationsAllApps = fresh.notificationsAllApps
+        notificationApps = fresh.notificationApps
+        notificationsHideBanner = fresh.notificationsHideBanner
         meetingLeadMinutes = fresh.meetingLeadMinutes
         meetingAlertAtStart = fresh.meetingAlertAtStart
         excludedCalendarIDs = fresh.excludedCalendarIDs
@@ -409,6 +420,10 @@ final class SettingsStore {
         "followBrowserDownloads",
         "browserTakeover",
         "takeoverKinds",
+        "notificationsEnabled",
+        "notificationsAllApps",
+        "notificationApps",
+        "notificationsHideBanner",
         "meetingLeadMinutes",
         "meetingAlertAtStart",
         "excludedCalendarIDs",
@@ -491,6 +506,10 @@ final class SettingsStore {
         if d.object(forKey: "followBrowserDownloads") != nil { followBrowserDownloads = d.bool(forKey: "followBrowserDownloads") }
         if d.object(forKey: "browserTakeover") != nil { browserTakeover = d.bool(forKey: "browserTakeover") }
         if let raw = d.stringArray(forKey: "takeoverKinds") { takeoverKinds = Set(raw.compactMap(FileKind.init(rawValue:))) }
+        if d.object(forKey: "notificationsEnabled") != nil { notificationsEnabled = d.bool(forKey: "notificationsEnabled") }
+        if d.object(forKey: "notificationsAllApps") != nil { notificationsAllApps = d.bool(forKey: "notificationsAllApps") }
+        if let value = d.stringArray(forKey: "notificationApps") { notificationApps = value }
+        if d.object(forKey: "notificationsHideBanner") != nil { notificationsHideBanner = d.bool(forKey: "notificationsHideBanner") }
         if d.object(forKey: "meetingLeadMinutes") != nil { meetingLeadMinutes = (1...60).clamp(d.integer(forKey: "meetingLeadMinutes")) }
         if d.object(forKey: "meetingAlertAtStart") != nil { meetingAlertAtStart = d.bool(forKey: "meetingAlertAtStart") }
         if let value = d.stringArray(forKey: "excludedCalendarIDs") { excludedCalendarIDs = value }

@@ -7,6 +7,17 @@ getting in your way.
 Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of memory and
 **~0% CPU** while you work.
 
+## What's new in 1.2.0
+
+- **Notifications in the notch.** WhatsApp, Slack, Teams, Mail and more drop down from the
+  notch. Reply right there, use the app's own buttons (Mark as Read, Archive…), open or
+  dismiss them, and find recent ones in the new Notifications tab. [More](#notifications)
+- **One-click setup for video downloads.** No Homebrew or Terminal: **Set Up** downloads
+  yt-dlp, FFmpeg and Deno, checks each against its checksum, and keeps yt-dlp up to date.
+  With Deno, YouTube downloads get every format. [More](#download-tools)
+- **Fixes:** the island no longer freezes while macOS asks for access to your Downloads
+  folder. Dropped downloads now resume where they stopped.
+
 ## What's new in 1.1.0
 
 - **Browser downloads in the notch.** Downloads from Safari, Chrome, Brave, Edge and Arc show
@@ -18,7 +29,7 @@ Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of 
   directly, without yt-dlp. Files get type icons, Quick Look previews and **Open With**.
 - **Cancel button** on every download that's running or waiting.
 
-See the [release notes](https://github.com/Zena4L/notch/releases/tag/v1.1.0) for details.
+See the [releases page](https://github.com/Zena4L/notch/releases) for details.
 
 ## Features
 
@@ -29,6 +40,7 @@ See the [release notes](https://github.com/Zena4L/notch/releases/tag/v1.1.0) for
 | **Timers** | Countdown and stopwatch, with a split bubble when two things are running at once. |
 | **Downloads** | Paste a link from X, YouTube or 1,000+ other sites to save the video or audio (via yt-dlp), or a link to any file. Downloads from Safari, Chrome, Brave, Edge and Arc show their progress in the notch automatically, and you can cancel them there. With the optional [browser extension](Extension/README.md), Notch does the downloading itself. Drag files out, AirDrop or share them. |
 | **Dashboard** | Widgets for CPU, memory, storage, network, battery, weather, today's events and clipboard history. |
+| **Notifications** | WhatsApp, Slack, Teams, Mail and more show under the notch. Reply, use the app's own buttons (Mark as Read, Archive…) or dismiss them without opening the app, and find recent ones in the Notifications tab. Optional, needs Accessibility. |
 | **Calendar** | A reminder before meetings, with a **Join** button for Zoom, Google Meet and Teams links. |
 | **Volume & brightness** | Replaces the system overlay with one from the notch (optional). |
 | **Battery** | Peeks when you plug in, unplug or run low. |
@@ -84,7 +96,7 @@ To update, download the new DMG and replace the app in Applications.
   On other displays the island slides down from the menu bar instead.
 - macOS 14 Sonoma or later. Liquid Glass materials need macOS 26 or later.
 - Xcode 27 or later to build.
-- [Homebrew](https://brew.sh), used for XcodeGen and, optionally, the download tools.
+- [Homebrew](https://brew.sh), to install XcodeGen (building only; the app itself doesn't need it).
 
 ## Building from source
 
@@ -120,20 +132,24 @@ To update, download the new DMG and replace the app in Applications.
 > Run `xcodegen` again whenever you add or remove source files. Edits to existing files
 > only need ⌘R.
 
-### Download tools (optional)
+### Download tools
 
-The Downloads tab needs [yt-dlp](https://github.com/yt-dlp/yt-dlp) and
-[FFmpeg](https://ffmpeg.org). Install them from the app (**Settings › Activities ›
-Downloads › Install with Homebrew**) or yourself:
+Video downloads need three free tools: [yt-dlp](https://github.com/yt-dlp/yt-dlp),
+[FFmpeg](https://ffmpeg.org) and [Deno](https://deno.com). Deno lets yt-dlp get every YouTube
+format. Click **Set Up** in the Downloads tab (or **Settings › Activities › Downloads**) and
+Notch handles the rest. It downloads about 150 MB, checks each file against its SHA-256
+checksum, and installs everything into `~/Library/Application Support/Notch/Tools`. There's
+no Homebrew and no Terminal involved, and Notch keeps yt-dlp up to date by itself.
 
-```sh
-brew install yt-dlp ffmpeg
-```
+FFmpeg ([martin-riedl.de](https://ffmpeg.martin-riedl.de) static builds) and Deno are pinned to
+the versions tested with each Notch release. yt-dlp follows its latest release, checked
+against the checksums published with it. **Remove** in Settings deletes them again.
+
+If you already have yt-dlp and FFmpeg from Homebrew, Notch uses those. **Use Notch's Own** in
+Settings switches to Notch's set, which includes Deno.
 
 Only download videos you have the right to keep. Some sites' terms, including YouTube's,
-restrict downloading.
-
-Links straight to a file (a PDF, a zip, a DMG…) don't need these tools.
+restrict downloading. Links straight to a file (a PDF, a zip, a DMG…) don't need these tools.
 
 ## Using Notch
 
@@ -163,6 +179,27 @@ If Notch isn't running, or can't fetch a file, the browser downloads it as usual
 listens on `127.0.0.1:47821` only, and accepts downloads only from the extension. Files are
 marked as downloaded from the internet, so macOS still checks apps and disk images.
 The extension doesn't work in Safari. See [Extension/README.md](Extension/README.md).
+
+### Notifications
+
+Turn on **Settings › Activities › Notifications** and give Notch Accessibility access. When
+a message arrives from WhatsApp, Slack, Teams, Mail, Messages, Outlook, Discord, Telegram or
+Signal (or from any app, if you choose), it drops down from the notch:
+
+- **Reply** opens a text field right in the island. Press ↩ to send; the reply goes through
+  the app's own inline reply, as if you'd used the macOS banner.
+- **The app's own buttons**, like Mark as Read or Archive, work from the island too.
+- **Open** (or a click on the message) takes you to the conversation; ✕ dismisses it.
+- The **Notifications tab** (🔔) keeps the last 30, with the same buttons.
+
+Notch closes the macOS banner once it's in the notch. Banners with Reply or other buttons stay
+until you use them, because macOS only accepts those buttons while the banner is on screen.
+For the same reason, Reply works best within a few seconds of the notification arriving.
+After that, Notch opens the app with your reply copied, ready to paste.
+
+To see it without waiting for a message, use **Settings › General › Try it › Notification**.
+If a notification doesn't show up, **Copy Diagnostics** in the same settings copies what your
+banners look like to Notch, for a bug report.
 
 ### Keyboard shortcuts
 
@@ -197,6 +234,7 @@ in place.
 |---|---|---|
 | Calendar reminders, Today widget | Calendars | To read upcoming events |
 | Volume & brightness overlay | Accessibility | To catch the media keys |
+| Notifications | Accessibility | To read notification banners and press their buttons (macOS has no other way for apps to see each other's notifications) |
 | Weather from your location | Location | Rounded to about 1 km; you can type a city instead |
 | Clipboard history | Pasteboard | macOS may ask whether Notch can read what other apps copy |
 
@@ -206,10 +244,14 @@ in place.
 - **Network** requests happen only for features you use:
   - lyrics: the song title and artist go to lrclib.net, when you open lyrics;
   - weather: the city or rounded location goes to Open-Meteo, when the dashboard opens;
-  - downloads: yt-dlp contacts the video's site; files go straight to the site they came from.
+  - downloads: yt-dlp contacts the video's site; files go straight to the site they came from;
+  - download tools: setting them up fetches yt-dlp from GitHub, FFmpeg from martin-riedl.de and
+    Deno from dl.deno.land, and Notch checks GitHub once a day for a newer yt-dlp.
 - **Browser downloads**: the extension sends the file's link, name and your cookies for that
   site to Notch on your own Mac (`127.0.0.1`). The cookies are kept in memory only.
 - **Clipboard history** is kept in memory only, and skips passwords from password managers.
+- **Notifications** are read from the banners on screen, kept in memory only (the last 30),
+  and forgotten when Notch quits. Replies go through each app's own inline reply.
 
 ## Development
 

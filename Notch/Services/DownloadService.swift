@@ -4,7 +4,8 @@ import Observation
 /// Saves videos (or their audio) from X, YouTube and the 1,000+ other sites yt-dlp supports,
 /// and plain files (PDFs, archives, installers…) handed over by the browser extension or pasted.
 ///
-/// yt-dlp and ffmpeg come from Homebrew; Notch can install and update them. Each video
+/// yt-dlp, FFmpeg and Deno are set up by `ToolInstaller` with one click (or found from
+/// Homebrew if you already have them), and yt-dlp is kept current. Each video
 /// download runs yt-dlp with machine-readable progress lines, one job at a time. Plain files
 /// go through URLSession (`DirectDownloader`) and run side by side. History is kept in
 /// Application Support so finished files stay in the tab across relaunches.
@@ -55,7 +56,11 @@ final class DownloadService {
     struct Tools: Equatable {
         var ytDLP: URL?
         var ffmpeg: URL?
+        /// Optional: lets yt-dlp solve YouTube's JavaScript challenges, for the full set of formats.
+        var deno: URL?
         var brew: URL?
+        /// yt-dlp is Notch's own copy (so Notch updates it) rather than Homebrew's.
+        var isManaged = false
         var isReady: Bool { ytDLP != nil && ffmpeg != nil }
     }
 
@@ -69,7 +74,10 @@ final class DownloadService {
     private(set) var items: [Item] = []
     private(set) var progress: [UUID: Progress] = [:]
     private(set) var tools = DownloadService.findTools()
+    /// Homebrew updates, for people whose yt-dlp came from Homebrew.
     private(set) var toolTask: ToolTask = .idle
+    /// One-click setup of yt-dlp, FFmpeg and Deno.
+    let installer: ToolInstaller
 
     var activeItem: Item? { items.first(where: \.isActive) }
     var finishedItems: [Item] { items.filter { $0.status == .done } }
@@ -118,7 +126,10 @@ final class DownloadService {
             .appendingPathComponent("Notch", isDirectory: true)
             .appendingPathComponent("downloads.json")
         direct = DirectDownloader(configuration: sessionConfiguration)
+        installer = ToolInstaller()
         load()
+        installer.onInstalled = { [weak self] in self?.refreshTools() }
+        installer.canSwap = { [weak self] in self?.process == nil }
         direct.handlers = .init(
             response: { [weak self] in self?.directResponse($0, $1) ?? false },
             progress: { [weak self] in self?.directProgress($0, written: $1, expected: $2) },
@@ -598,32 +609,48 @@ final class DownloadService {
 
     // MARK: Tools
 
-    static func findTools() -> Tools {
+    static func findTools(managed: URL = ToolInstaller.defaultFolder) -> Tools {
         func find(_ name: String) -> URL? {
             searchPaths.map { URL(fileURLWithPath: $0).appendingPathComponent(name) }
                 .first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
-        return Tools(ytDLP: find("yt-dlp"), ffmpeg: find("ffmpeg"), brew: find("brew"))
+        func own(_ path: String) -> URL? {
+            let url = managed.appendingPathComponent(path)
+            return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
+        }
+        let ownYtDLP = own("yt-dlp/yt-dlp_macos")
+        return Tools(
+            ytDLP: ownYtDLP ?? find("yt-dlp"),
+            ffmpeg: own("bin/ffmpeg") ?? find("ffmpeg"),
+            deno: own("bin/deno") ?? find("deno"),
+            brew: find("brew"),
+            isManaged: ownYtDLP != nil
+        )
     }
 
     func refreshTools() {
-        let found = Self.findTools()
+        let found = Self.findTools(managed: installer.folder)
         if found != tools { tools = found }
         startNext()
     }
 
-    /// `brew install yt-dlp ffmpeg` — a few minutes the first time (ffmpeg is large).
+    /// One click: Notch downloads, checks and sets up yt-dlp, FFmpeg and Deno itself.
     func installTools() {
-        runBrew(["install", "yt-dlp", "ffmpeg"], title: "Installing yt-dlp and ffmpeg…")
+        installer.install()
     }
 
     func updateTools() {
-        runBrew(["upgrade", "yt-dlp"], title: "Updating yt-dlp…")
+        if tools.isManaged || tools.ytDLP == nil {
+            Task { await installer.updateYtDLP() }
+        } else {
+            runBrew(["upgrade", "yt-dlp"], title: "Updating yt-dlp…")
+        }
     }
 
     /// At most once a day, and never during a download.
     func updateToolsIfDue() {
-        guard settings.autoUpdateDownloader, tools.isReady, tools.brew != nil, process == nil, toolTask == .idle else { return }
+        guard settings.autoUpdateDownloader, tools.isReady, process == nil, toolTask == .idle, !installer.isUpdating,
+              tools.isManaged || tools.brew != nil else { return }
         let last = UserDefaults.standard.object(forKey: Self.lastUpdateKey) as? Date ?? .distantPast
         guard Date.now.timeIntervalSince(last) > 24 * 3600 else { return }
         UserDefaults.standard.set(Date.now, forKey: Self.lastUpdateKey)
@@ -672,13 +699,16 @@ final class DownloadService {
 
     func dismissToolError() {
         if case .failed = toolTask { toolTask = .idle }
+        installer.dismissError()
     }
 
     // MARK: Building the command
 
     static var environment: [String: String] {
         var env = ProcessInfo.processInfo.environment
-        env["PATH"] = (searchPaths + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]).joined(separator: ":")
+        // Notch's own tools first, so yt-dlp finds Deno and ffprobe next to it.
+        let own = ToolInstaller.defaultFolder.appendingPathComponent("bin").path
+        env["PATH"] = ([own] + searchPaths + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]).joined(separator: ":")
         env["PYTHONIOENCODING"] = "utf-8"
         return env
     }

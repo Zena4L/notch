@@ -196,6 +196,8 @@ struct PeekView: View {
             DownloadPeekView(succeeded: true)
         case .downloadFailed:
             DownloadPeekView(succeeded: false)
+        case .notification(let id):
+            NotificationPeekView(id: id)
         }
     }
 }

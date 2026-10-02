@@ -59,6 +59,7 @@ struct ExpandedView: View {
                 case .downloads: DownloadsView()
                 case .dashboard: DashboardView()
                 case .timer: TimerTabView()
+                case .notifications: NotificationsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,6 +96,7 @@ private struct TabButton: View {
         case .lyrics: "quote.bubble"
         case .downloads: "arrow.down.circle"
         case .timer: "timer"
+        case .notifications: "bell"
         }
     }
 
@@ -105,6 +107,7 @@ private struct TabButton: View {
         case .lyrics: "Lyrics"
         case .downloads: "Downloads"
         case .timer: "Timer"
+        case .notifications: "Notifications"
         }
     }
 }

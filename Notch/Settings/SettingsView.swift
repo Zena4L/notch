@@ -152,7 +152,7 @@ private struct TryItButtons: View {
     private let items: [(String, String)] = [
         ("Charging", "charging"), ("On battery", "unplugged"), ("Low battery", "lowBattery"),
         ("Song change", "trackChange"), ("Meeting", "meeting"), ("Timer done", "timerDone"),
-        ("Volume", "volume"), ("Downloaded", "downloadDone"),
+        ("Volume", "volume"), ("Downloaded", "downloadDone"), ("Notification", "notification"),
     ]
 
     var body: some View {

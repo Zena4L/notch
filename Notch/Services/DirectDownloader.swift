@@ -33,6 +33,19 @@ nonisolated final class DirectDownloader: NSObject, URLSessionDataDelegate, URLS
         task.resume()
     }
 
+    /// Carries on from where a dropped download stopped (see `resumeData(from:)`).
+    func resume(_ id: UUID, from resumeData: Data) {
+        let task = session.downloadTask(withResumeData: resumeData)
+        ids[task.taskIdentifier] = id
+        tasks[id] = task
+        task.resume()
+    }
+
+    /// What URLSession kept of a download that failed part-way, if anything.
+    static func resumeData(from error: Error?) -> Data? {
+        (error as NSError?)?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+    }
+
     func cancel(_ id: UUID) {
         tasks[id]?.cancel()
     }

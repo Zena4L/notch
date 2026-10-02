@@ -1,7 +1,8 @@
 import CoreGraphics
+import Foundation
 
 enum IslandTab: Hashable {
-    case dashboard, nowPlaying, lyrics, downloads, timer
+    case dashboard, nowPlaying, lyrics, downloads, timer, notifications
 
     /// The tab's content size at the Default expanded size, from the design guide.
     /// The dashboard grows with its number of widget rows.
@@ -9,7 +10,7 @@ enum IslandTab: Hashable {
         switch self {
         case .timer: CGSize(width: 540, height: 176)
         case .lyrics: CGSize(width: 540, height: 300)
-        case .nowPlaying, .downloads: CGSize(width: 540, height: 212)
+        case .nowPlaying, .downloads, .notifications: CGSize(width: 540, height: 212)
         case .dashboard: CGSize(width: 540, height: DashboardLayout.height(rows: dashboardRows))
         }
     }
@@ -33,18 +34,20 @@ enum Peek: Hashable {
     case hud(HUDService.Kind, level: Int, muted: Bool)
     case downloadDone
     case downloadFailed
+    /// A notification from another app (see NotificationService).
+    case notification(UUID)
 
     /// Peeks with buttons stay open while the pointer is over them.
     var isInteractive: Bool {
         switch self {
-        case .meeting, .downloadDone, .downloadFailed: true
+        case .meeting, .downloadDone, .downloadFailed, .notification: true
         default: false
         }
     }
 
     var duration: Duration {
         switch self {
-        case .meeting: .seconds(6)
+        case .meeting, .notification: .seconds(6)
         case .downloadDone, .downloadFailed: .seconds(5)
         case .hud: .milliseconds(1500)
         default: .seconds(3)
@@ -144,6 +147,8 @@ enum IslandState: Hashable {
             return Metrics(width: 430, height: 92, bottomRadius: 26)
         case .peek(.meeting):
             return Metrics(width: 456, height: 108, bottomRadius: 28)
+        case .peek(.notification):
+            return Metrics(width: 468, height: 128, bottomRadius: 30)
         case .expanded(let tab):
             let s = options.expandedScale
             let size = tab.baseSize(dashboardRows: options.dashboardRows)
@@ -158,7 +163,7 @@ enum IslandState: Hashable {
     /// States that grow below the menu bar float above content, so they cast a shadow.
     var hasShadow: Bool {
         switch self {
-        case .expanded, .peek(.trackChange), .peek(.meeting), .peek(.downloadDone), .peek(.downloadFailed): true
+        case .expanded, .peek(.trackChange), .peek(.meeting), .peek(.downloadDone), .peek(.downloadFailed), .peek(.notification): true
         default: false
         }
     }
@@ -183,6 +188,7 @@ enum IslandState: Hashable {
         case .peek(.hud(let kind, _, _)): "peek-hud-\(kind)"
         case .peek(.downloadDone): "peek-download-done"
         case .peek(.downloadFailed): "peek-download-failed"
+        case .peek(.notification(let id)): "peek-notification-\(id)"
         case .expanded: "expanded"
         }
     }

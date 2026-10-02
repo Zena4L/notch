@@ -28,6 +28,7 @@ final class IslandCoordinator {
     let timers: TimerService
     let nowPlaying: NowPlayingService
     let downloads: DownloadService
+    let notifications: NotificationService
     let calendar: CalendarService
     let lyrics: LyricsService
     let stats: SystemStatsService
@@ -64,6 +65,7 @@ final class IslandCoordinator {
         if settings.nowPlayingEnabled { tabs.append(.nowPlaying) }
         if settings.downloadsEnabled { tabs.append(.downloads) }
         if settings.timersEnabled || focusedTimer != nil { tabs.append(.timer) }
+        if settings.notificationsEnabled { tabs.append(.notifications) }
         return tabs
     }
 
@@ -131,7 +133,8 @@ final class IslandCoordinator {
         settings: SettingsStore, battery: BatteryService, timers: TimerService,
         nowPlaying: NowPlayingService, downloads: DownloadService, calendar: CalendarService,
         lyrics: LyricsService = LyricsService(),
-        stats: SystemStatsService? = nil, weather: WeatherService? = nil, clipboard: ClipboardService? = nil
+        stats: SystemStatsService? = nil, weather: WeatherService? = nil, clipboard: ClipboardService? = nil,
+        notifications: NotificationService? = nil
     ) {
         self.settings = settings
         self.battery = battery
@@ -143,6 +146,7 @@ final class IslandCoordinator {
         self.stats = stats ?? SystemStatsService(settings: settings)
         self.weather = weather ?? WeatherService(settings: settings)
         self.clipboard = clipboard ?? ClipboardService(settings: settings)
+        self.notifications = notifications ?? NotificationService(settings: settings)
     }
 
     // MARK: Pointer
@@ -173,7 +177,8 @@ final class IslandCoordinator {
         hoverTask?.cancel()
         showsHoverTitle = false
         if peek?.isInteractive == true {
-            dismissPeek(after: .seconds(2))
+            // Typing a reply in it: leave it open until that's done.
+            if !isTyping { dismissPeek(after: .seconds(2)) }
             return
         }
         guard isExpanded else { return }
@@ -275,8 +280,25 @@ final class IslandCoordinator {
         case .meeting: settings.calendarEnabled
         case .hud: settings.hudEnabled
         case .downloadDone, .downloadFailed: settings.downloadsEnabled && settings.downloadPeek
+        case .notification: settings.notificationsEnabled
         case .timerDone: true
         }
+    }
+
+    /// Keeps the current peek open, e.g. while you type a reply in it.
+    func holdPeek() {
+        peekTask?.cancel()
+    }
+
+    /// Lets a held peek close after a moment.
+    func releasePeek(after delay: Duration = .seconds(1.5)) {
+        guard peek != nil else { return }
+        dismissPeek(after: delay)
+    }
+
+    /// Asks for keyboard focus, for typing in the island.
+    func requestKeyboard() {
+        onFocusRequest?()
     }
 
     /// Closes the current peek straight away (e.g. after its button was used).

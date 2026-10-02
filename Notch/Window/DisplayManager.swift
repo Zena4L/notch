@@ -9,6 +9,7 @@ final class DisplayManager {
     private let nowPlaying: NowPlayingService
     private let downloads: DownloadService
     private let calendar: CalendarService
+    private let notifications: NotificationService
     // Shared by every display's island.
     private let lyrics = LyricsService()
     private let stats: SystemStatsService
@@ -33,8 +34,10 @@ final class DisplayManager {
 
     init(
         settings: SettingsStore, battery: BatteryService, timers: TimerService,
-        nowPlaying: NowPlayingService, downloads: DownloadService, calendar: CalendarService
+        nowPlaying: NowPlayingService, downloads: DownloadService, calendar: CalendarService,
+        notifications: NotificationService
     ) {
+        self.notifications = notifications
         self.settings = settings
         self.battery = battery
         self.timers = timers
@@ -53,6 +56,9 @@ final class DisplayManager {
         timers.onCountdownFinished = { [weak self] in self?.countdownFinished() }
         downloads.onFinished = { [weak self] _ in self?.showEverywhere(.downloadDone) }
         downloads.onFailed = { [weak self] _ in self?.showEverywhere(.downloadFailed) }
+        notifications.onArrive = { [weak self] item in
+            if item.isSample { self?.preview(.notification(item.id)) } else { self?.showEverywhere(.notification(item.id)) }
+        }
         fullScreen.onChange = { [weak self] in self?.updateFullScreen() }
 
         rebuild()
@@ -70,6 +76,7 @@ final class DisplayManager {
         observers.append(center.addObserver(forName: .previewPeek, object: nil, queue: .main) { [weak self] note in
             let name = note.object as? String
             MainActor.assumeIsolated {
+                if name == "notification" { self?.notifications.showSample(); return }
                 guard let name, let peek = Peek(previewName: name) else { return }
                 self?.preview(peek)
             }
@@ -118,7 +125,7 @@ final class DisplayManager {
         let coordinator = IslandCoordinator(
             settings: settings, battery: battery, timers: timers,
             nowPlaying: nowPlaying, downloads: downloads, calendar: calendar, lyrics: lyrics,
-            stats: stats, weather: weather, clipboard: clipboard
+            stats: stats, weather: weather, clipboard: clipboard, notifications: notifications
         )
         let controller = IslandWindowController(screen: screen, coordinator: coordinator)
         coordinator.onFocusRequest = { [weak controller] in controller?.panel.makeKey() }

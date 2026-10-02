@@ -22,6 +22,7 @@ struct NotchApp: App {
                 .environment(appDelegate.hud)
                 .environment(appDelegate.downloads)
                 .environment(appDelegate.browserBridge)
+                .environment(appDelegate.notifications)
         }
     }
 }
