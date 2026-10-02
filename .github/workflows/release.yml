@@ -56,7 +56,13 @@ jobs:
 
           Requires a Mac running macOS 14 or later. Best on MacBooks with a notch.
           NOTES
-          gh release create "$GITHUB_REF_NAME" \
-            "build/release/Notch-$VERSION.dmg" "build/release/Notch-$VERSION.dmg.sha256" \
-            "build/release/Notch-Extension-$VERSION.zip" \
-            --title "Notch $VERSION" --notes-file notes.md --generate-notes
+          FILES=("build/release/Notch-$VERSION.dmg" "build/release/Notch-$VERSION.dmg.sha256" \
+            "build/release/Notch-Extension-$VERSION.zip")
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # The tag was pushed again (e.g. moved to a rewritten commit): keep the release
+            # and its notes, and replace the files together so the checksum matches the DMG.
+            gh release upload "$GITHUB_REF_NAME" "${FILES[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${FILES[@]}" \
+              --title "Notch $VERSION" --notes-file notes.md --generate-notes
+          fi
