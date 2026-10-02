@@ -7,6 +7,19 @@ getting in your way.
 Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of memory and
 **~0% CPU** while you work.
 
+## What's new in 1.1.0
+
+- **Browser downloads in the notch.** Downloads from Safari, Chrome, Brave, Edge and Arc show
+  their progress in the island, with no extension or setup. Cancel them from the notch, and
+  find the finished file in the Downloads tab. [More](#browser-downloads)
+- **Optional: Notch does the downloading.** A browser extension for Chrome-based browsers and
+  Firefox hands downloads over to Notch, with a choice of which file types it takes.
+- **Any file, not just videos.** Paste a link to a PDF, image, zip or DMG and Notch downloads it
+  directly, without yt-dlp. Files get type icons, Quick Look previews and **Open With**.
+- **Cancel button** on every download that's running or waiting.
+
+See the [release notes](https://github.com/Zena4L/notch/releases/tag/v1.1.0) for details.
+
 ## Features
 
 | | |
@@ -122,30 +135,34 @@ restrict downloading.
 
 Links straight to a file (a PDF, a zip, a DMG…) don't need these tools.
 
-### Browser downloads
-
-There's nothing to set up: when you download something in Safari, Chrome, Brave, Edge or Arc,
-its progress shows in the notch, ✕ cancels it, and the finished file lands in the Downloads
-tab. Browsers publish their download progress to macOS, and Notch follows it for your Downloads
-folder. You can turn this off in **Settings › Activities › Browser downloads**.
-
-**Optional: let Notch do the downloading.** With the extension, Chrome, Edge, Brave, Arc or
-Firefox hand downloads over to Notch, which saves them itself:
-
-1. Turn on **Settings › Activities › Browser downloads › Take over downloads from your browser**,
-   and choose which file types Notch should take.
-2. Click **Show Extension Folder** and load it as an unpacked extension (`chrome://extensions` ›
-   Developer mode › Load unpacked; in Firefox, `about:debugging` › Load Temporary Add-on).
-
-If Notch isn't running, or can't fetch a file, the browser downloads it as usual. Notch
-listens on `127.0.0.1:47821` only, and accepts downloads only from the extension. Files are
-marked as downloaded from the internet, so macOS still checks apps and disk images.
-Safari isn't supported yet. See [Extension/README.md](Extension/README.md).
-
 ## Using Notch
 
 - **Hover** the notch to expand the island. Move away, or press **Esc**, to close it.
 - **Click** the menu bar icon for Settings and Quit.
+
+### Browser downloads
+
+There's nothing to set up. When you download something in Safari, Chrome, Brave, Edge or Arc,
+it shows in the notch: live progress (with ✕ to cancel it), then a peek and the finished file
+in the Downloads tab, ready to drag, AirDrop or share. Browsers publish their download progress
+to macOS, and Notch follows it for your Downloads folder. Small files that finish in about a
+second (Chrome-based browsers don't report progress for those) appear as soon as they're done.
+You can turn this off in **Settings › Activities › Browser downloads**.
+
+**Optional: let Notch do the downloading.** With the Notch extension, Chrome, Edge, Brave, Arc
+or Firefox hand downloads over to Notch, which saves them itself:
+
+1. Turn on **Settings › Activities › Browser downloads › Let Notch do the downloading**, and
+   choose which file types Notch should take (documents, images, archives, apps and disk
+   images, video and audio, everything else).
+2. Click **Show Extension Folder** and load it as an unpacked extension (`chrome://extensions` ›
+   Developer mode › Load unpacked; in Firefox, `about:debugging` › Load Temporary Add-on). It's
+   also attached to each release as `Notch-Extension-x.y.z.zip`.
+
+If Notch isn't running, or can't fetch a file, the browser downloads it as usual. Notch
+listens on `127.0.0.1:47821` only, and accepts downloads only from the extension. Files are
+marked as downloaded from the internet, so macOS still checks apps and disk images.
+The extension doesn't work in Safari. See [Extension/README.md](Extension/README.md).
 
 ### Keyboard shortcuts
 

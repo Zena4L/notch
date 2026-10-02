@@ -1,6 +1,10 @@
 # Notch browser extension
 
-Hands the files you download in your browser over to Notch. Notch saves them to your
+You don't need this to see your downloads in the notch: Notch follows Safari, Chrome, Brave,
+Edge and Arc downloads on its own. The extension is for when you want **Notch to do the
+downloading** instead of the browser.
+
+It hands the files you download in your browser over to Notch. Notch saves them to your
 download folder and shows the progress in the island. When it's done you can drag the file
 out, AirDrop it or share it from the Downloads tab.
 
@@ -10,8 +14,9 @@ or can't fetch a file, the browser downloads it as usual, so nothing gets lost.
 
 ## Install
 
-1. In Notch, open **Settings › Activities › Browser downloads**, turn on **Take over downloads
-   from your browser**, and click **Show Extension Folder**.
+1. In Notch, open **Settings › Activities › Browser downloads**, turn on **Let Notch do the
+   downloading**, and click **Show Extension Folder**. (The extension is also attached to each
+   release as `Notch-Extension-x.y.z.zip`.)
 2. Load that folder in your browser:
    - **Chrome, Edge, Brave, Arc, Vivaldi:** open `chrome://extensions`, turn on **Developer
      mode**, click **Load unpacked**, and choose the folder.
