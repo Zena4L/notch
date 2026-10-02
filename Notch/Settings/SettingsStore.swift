@@ -43,6 +43,42 @@ enum DownloadQuality: String, CaseIterable, Codable {
     case best, p1080, p720, audio
 }
 
+/// Broad file types, for browser downloads Notch takes over and for icons in the Downloads tab.
+enum FileKind: String, CaseIterable, Codable {
+    case document, image, archive, installer, media, other
+
+    var extensions: Set<String> {
+        switch self {
+        case .document: ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pages", "numbers", "key", "txt", "rtf", "csv", "epub", "md", "odt", "ods", "odp"]
+        case .image: ["png", "jpg", "jpeg", "heic", "heif", "gif", "webp", "svg", "tif", "tiff", "bmp", "avif"]
+        case .archive: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"]
+        case .installer: ["dmg", "pkg", "app", "iso", "mpkg"]
+        case .media: ["mp4", "mov", "mkv", "webm", "avi", "m4v", "mp3", "m4a", "wav", "flac", "aac", "ogg", "opus"]
+        case .other: []
+        }
+    }
+
+    /// By extension first (".tar.gz" counts as an archive), then by MIME type.
+    static func of(filename: String, mime: String? = nil) -> FileKind {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        if !ext.isEmpty, let kind = allCases.first(where: { $0.extensions.contains(ext) }) { return kind }
+        let mime = (mime ?? "").lowercased().split(separator: ";").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        if mime.hasPrefix("image/") { return .image }
+        if mime.hasPrefix("video/") || mime.hasPrefix("audio/") { return .media }
+        if mime.hasPrefix("text/") && mime != "text/html" { return .document }
+        switch mime {
+        case "application/pdf", "application/msword", "application/rtf", "application/epub+zip": return .document
+        case "application/zip", "application/x-zip-compressed", "application/gzip", "application/x-tar",
+             "application/x-7z-compressed", "application/vnd.rar", "application/x-bzip2", "application/x-xz": return .archive
+        case "application/x-apple-diskimage", "application/x-iso9660-image", "application/vnd.apple.installer+xml": return .installer
+        default:
+            if mime.hasPrefix("application/vnd.openxmlformats-officedocument") || mime.hasPrefix("application/vnd.ms-")
+                || mime.hasPrefix("application/vnd.oasis.opendocument") { return .document }
+            return .other
+        }
+    }
+}
+
 enum VideoCompatibility: String, CaseIterable {
     /// H.264 + AAC in MP4, up to 1080p — plays everywhere, including QuickTime and iPhone.
     case quickTime
@@ -170,6 +206,12 @@ final class SettingsStore {
     var cookieBrowser: CookieBrowser = .none { didSet { persist("cookieBrowser", cookieBrowser.rawValue) } }
     /// Keep yt-dlp current; sites change often.
     var autoUpdateDownloader: Bool = true { didSet { persist("autoUpdateDownloader", autoUpdateDownloader) } }
+    /// Show downloads Safari, Chrome and other browsers make in the island. No extension needed.
+    var followBrowserDownloads: Bool = true { didSet { persist("followBrowserDownloads", followBrowserDownloads) } }
+    /// Let the Notch browser extension hand over downloads you click in Chrome or Firefox.
+    var browserTakeover: Bool = false { didSet { persist("browserTakeover", browserTakeover) } }
+    /// File types Notch takes over; the browser keeps the rest.
+    var takeoverKinds: Set<FileKind> = Set(FileKind.allCases) { didSet { persist("takeoverKinds", takeoverKinds.map(\.rawValue).sorted()) } }
     /// Minutes before an event starts that the reminder appears.
     var meetingLeadMinutes: Int = 5 { didSet { persist("meetingLeadMinutes", meetingLeadMinutes) } }
     var meetingAlertAtStart: Bool = false { didSet { persist("meetingAlertAtStart", meetingAlertAtStart) } }
@@ -290,6 +332,9 @@ final class SettingsStore {
         fileNaming = fresh.fileNaming
         cookieBrowser = fresh.cookieBrowser
         autoUpdateDownloader = fresh.autoUpdateDownloader
+        followBrowserDownloads = fresh.followBrowserDownloads
+        browserTakeover = fresh.browserTakeover
+        takeoverKinds = fresh.takeoverKinds
         meetingLeadMinutes = fresh.meetingLeadMinutes
         meetingAlertAtStart = fresh.meetingAlertAtStart
         excludedCalendarIDs = fresh.excludedCalendarIDs
@@ -361,6 +406,9 @@ final class SettingsStore {
         "fileNaming",
         "cookieBrowser",
         "autoUpdateDownloader",
+        "followBrowserDownloads",
+        "browserTakeover",
+        "takeoverKinds",
         "meetingLeadMinutes",
         "meetingAlertAtStart",
         "excludedCalendarIDs",
@@ -440,6 +488,9 @@ final class SettingsStore {
         if let raw = d.string(forKey: "fileNaming"), let value = FileNaming(rawValue: raw) { fileNaming = value }
         if let raw = d.string(forKey: "cookieBrowser"), let value = CookieBrowser(rawValue: raw) { cookieBrowser = value }
         if d.object(forKey: "autoUpdateDownloader") != nil { autoUpdateDownloader = d.bool(forKey: "autoUpdateDownloader") }
+        if d.object(forKey: "followBrowserDownloads") != nil { followBrowserDownloads = d.bool(forKey: "followBrowserDownloads") }
+        if d.object(forKey: "browserTakeover") != nil { browserTakeover = d.bool(forKey: "browserTakeover") }
+        if let raw = d.stringArray(forKey: "takeoverKinds") { takeoverKinds = Set(raw.compactMap(FileKind.init(rawValue:))) }
         if d.object(forKey: "meetingLeadMinutes") != nil { meetingLeadMinutes = (1...60).clamp(d.integer(forKey: "meetingLeadMinutes")) }
         if d.object(forKey: "meetingAlertAtStart") != nil { meetingAlertAtStart = d.bool(forKey: "meetingAlertAtStart") }
         if let value = d.stringArray(forKey: "excludedCalendarIDs") { excludedCalendarIDs = value }

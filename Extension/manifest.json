@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Notch",
+  "version": "1.0.0",
+  "description": "Hands the files you download over to Notch, which saves them and shows them in the island.",
+  "permissions": ["downloads", "cookies", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "action": {
+    "default_title": "Notch: taking over downloads (click to turn off)",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "browser_specific_settings": {
+    "gecko": { "id": "notch@clementbogyah.com", "strict_min_version": "121.0" }
+  }
+}

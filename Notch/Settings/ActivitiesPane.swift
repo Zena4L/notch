@@ -81,6 +81,7 @@ struct ActivitiesPane: View {
             }
 
             DownloadsSettings()
+            BrowserDownloadsSettings()
 
             Section("Needs your permission") {
                 CalendarPermissionRows()
@@ -484,6 +485,109 @@ private struct DownloadsSettings: View {
         NSApp.activate()
         if panel.runModal() == .OK, let url = panel.url {
             settings.downloadFolder = url.path
+        }
+    }
+}
+
+/// Settings › Activities › Browser downloads: following the browser's downloads, and the
+/// optional extension hand-off with the file types it takes.
+private struct BrowserDownloadsSettings: View {
+    @Environment(SettingsStore.self) private var settings
+    @Environment(BrowserBridgeService.self) private var bridge
+
+    var body: some View {
+        @Bindable var settings = settings
+
+        if settings.downloadsEnabled {
+            Section {
+                Toggle(isOn: $settings.followBrowserDownloads) {
+                    Text("Show browser downloads in the island")
+                    Text("Progress, cancel and the finished file for downloads from Safari, Chrome, Brave, Edge and Arc. Nothing to install")
+                }
+                Toggle(isOn: $settings.browserTakeover) {
+                    Text("Let Notch do the downloading · needs the extension")
+                    Text("Chrome, Edge, Brave, Arc or Firefox hand downloads to Notch, which saves them itself. Choose which file types below")
+                }
+                if settings.browserTakeover {
+                    LabeledContent {
+                        Button("Show Extension Folder", action: showExtension)
+                    } label: {
+                        Text("Notch extension")
+                        status
+                    }
+                    ForEach(FileKind.allCases, id: \.self) { kind in
+                        Toggle(isOn: Binding(
+                            get: { settings.takeoverKinds.contains(kind) },
+                            set: { on in
+                                if on { settings.takeoverKinds.insert(kind) } else { settings.takeoverKinds.remove(kind) }
+                            }
+                        )) {
+                            Text(kind.title)
+                            Text(kind.examples)
+                        }
+                        .padding(.leading, 16)
+                    }
+                }
+            } header: {
+                Text("Browser downloads")
+            } footer: {
+                if settings.browserTakeover {
+                    Text("Install it once: open chrome://extensions (or about:debugging in Firefox), turn on Developer mode, choose Load unpacked and pick the folder. File types you turn off stay with the browser. Safari isn't supported yet.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        if let problem = bridge.problem {
+            Text(problem).foregroundStyle(.red)
+        } else if let seen = bridge.lastSeen {
+            Text("Connected · last seen \(seen.formatted(.relative(presentation: .named)))").foregroundStyle(.green)
+        } else {
+            Text("Waiting for the extension. Open your browser after installing it").foregroundStyle(.orange)
+        }
+    }
+
+    /// Copies the bundled extension somewhere stable (so app updates don't move it) and reveals it.
+    private func showExtension() {
+        guard let bundled = Bundle.main.resourceURL?.appendingPathComponent("Extension", isDirectory: true) else { return }
+        let target = URL.applicationSupportDirectory
+            .appendingPathComponent("Notch", isDirectory: true)
+            .appendingPathComponent("Browser Extension", isDirectory: true)
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+            try fm.copyItem(at: bundled, to: target)
+            NSWorkspace.shared.activateFileViewerSelecting([target])
+        } catch {
+            NSWorkspace.shared.activateFileViewerSelecting([bundled])
+        }
+    }
+}
+
+private extension FileKind {
+    var title: String {
+        switch self {
+        case .document: "Documents"
+        case .image: "Images"
+        case .archive: "Archives"
+        case .installer: "Apps and disk images"
+        case .media: "Video and audio files"
+        case .other: "Everything else"
+        }
+    }
+
+    var examples: String {
+        switch self {
+        case .document: "PDF, Word, Excel, PowerPoint, Pages, text, EPUB"
+        case .image: "PNG, JPEG, HEIC, GIF, WebP, SVG"
+        case .archive: "ZIP, RAR, 7z, tar.gz"
+        case .installer: "DMG, PKG, ISO"
+        case .media: "MP4, MOV, MKV, MP3, M4A, WAV"
+        case .other: "Files of any other type"
         }
     }
 }

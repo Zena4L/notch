@@ -61,6 +61,12 @@ targets:
           rm -rf "$DEST" && mkdir -p "$DEST"
           cp -R "$SRCROOT/Vendor/MediaRemoteAdapter/MediaRemoteAdapter.framework" \
                 "$SRCROOT/Vendor/MediaRemoteAdapter/mediaremote-adapter.pl" "$DEST/"
+      # The browser extension, for Settings › Activities › Browser downloads › Show Extension Folder.
+      - name: Embed browser extension
+        basedOnDependencyAnalysis: false
+        script: |
+          DEST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Extension"
+          rm -rf "$DEST" && cp -R "$SRCROOT/Extension" "$DEST"
 
   NotchTests:
     type: bundle.unit-test

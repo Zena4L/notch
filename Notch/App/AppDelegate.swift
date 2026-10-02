@@ -5,6 +5,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let nowPlaying = NowPlayingService()
     let calendar: CalendarService
     let downloads: DownloadService
+    /// Takes over downloads clicked in the browser, through the Notch extension.
+    let browserBridge: BrowserBridgeService
+    /// Shows downloads the browser makes itself in the island; no extension needed.
+    private let browserWatcher: BrowserDownloadWatcher
     let hud: HUDService
     /// Which shortcuts registered successfully, for Settings › Shortcuts.
     let hotkeyStatus = HotkeyStatus()
@@ -19,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     override init() {
         calendar = CalendarService(settings: settings)
         downloads = DownloadService(settings: settings)
+        browserBridge = BrowserBridgeService(settings: settings, downloads: downloads)
+        browserWatcher = BrowserDownloadWatcher(settings: settings, downloads: downloads)
         hud = HUDService(settings: settings)
         super.init()
     }

@@ -2,6 +2,7 @@
 # Builds Notch for release and packages it as a DMG.
 #
 #   scripts/release.sh 1.2.0        → build/release/Notch-1.2.0.dmg (+ .sha256)
+#                                     build/release/Notch-Extension-1.2.0.zip (browser extension)
 #
 # The app is ad-hoc signed (no paid Apple Developer account), so people opening it for the
 # first time need System Settings › Privacy & Security › Open Anyway. See the README.
@@ -45,3 +46,7 @@ rm -rf "$STAGE"
 (cd "$OUT" && shasum -a 256 "Notch-$VERSION.dmg" > "Notch-$VERSION.dmg.sha256")
 echo "==> $DMG ($(du -h "$DMG" | cut -f1))"
 cat "$DMG.sha256"
+
+# The extension is also inside the app (Settings › Show Extension Folder); this is for people who want it on its own.
+(cd "$ROOT" && zip -qr "$OUT/Notch-Extension-$VERSION.zip" Extension -x '*.DS_Store')
+echo "==> $OUT/Notch-Extension-$VERSION.zip"

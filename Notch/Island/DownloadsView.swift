@@ -1,8 +1,9 @@
 import QuickLookThumbnailing
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// The Downloads tab: paste a link on top; downloads and finished files below,
-/// with AirDrop and Share beside them.
+/// The Downloads tab: paste a link on top; downloads (videos, and files handed over by the
+/// browser) and finished files below, with AirDrop and Share beside them.
 struct DownloadsView: View {
     @Environment(IslandCoordinator.self) private var coordinator
     @State private var link = ""
@@ -15,7 +16,10 @@ struct DownloadsView: View {
         let downloads = coordinator.downloads
         VStack(spacing: 10) {
             linkBar(downloads)
-            if !downloads.tools.isReady || downloads.toolTask != .idle {
+            // Plain files don't need yt-dlp, so only block the list while a video is waiting for it.
+            let needsTools = !downloads.tools.isReady || downloads.toolTask != .idle
+            let videoWaiting = downloads.items.contains { !$0.isDirect && $0.status == .queued }
+            if needsTools && (downloads.items.isEmpty || videoWaiting) {
                 ToolsBanner()
             } else if downloads.items.isEmpty {
                 emptyState
@@ -41,7 +45,7 @@ struct DownloadsView: View {
         HStack(spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "link").font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
-                TextField("", text: $link, prompt: Text("Paste a video link from X, YouTube…").foregroundStyle(.white.opacity(0.4)))
+                TextField("", text: $link, prompt: Text("Paste a video or file link…").foregroundStyle(.white.opacity(0.4)))
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused($fieldFocused)
@@ -90,10 +94,10 @@ struct DownloadsView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
-                    .background(link.isEmpty || !downloads.tools.isReady ? .white.opacity(0.12) : Theme.blue, in: RoundedRectangle(cornerRadius: 9))
+                    .background(canStart(downloads) ? Theme.blue : .white.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
             }
             .buttonStyle(.plain)
-            .disabled(link.isEmpty || !downloads.tools.isReady)
+            .disabled(!canStart(downloads))
             .accessibilityLabel("Download")
         }
     }
@@ -105,6 +109,12 @@ struct DownloadsView: View {
         case .p720: "720p"
         case .audio: "MP3"
         }
+    }
+
+    /// Videos need yt-dlp; links straight to a file (a PDF, a zip…) don't.
+    private func canStart(_ downloads: DownloadService) -> Bool {
+        guard !link.isEmpty else { return false }
+        return downloads.tools.isReady || DownloadService.webURL(from: link).map(DownloadService.isFileLink) == true
     }
 
     private func start(_ downloads: DownloadService) {
@@ -121,7 +131,10 @@ struct DownloadsView: View {
     private var emptyState: some View {
         VStack(spacing: 6) {
             Image(systemName: "arrow.down.circle").font(.system(size: 22))
-            Text("Copy a video link, then press Paste and ↩").font(.system(size: 12.5))
+            Text(coordinator.settings.browserTakeover
+                 ? "Download something in your browser, or paste a link and press ↩"
+                 : "Copy a video or file link, then press Paste and ↩")
+                .font(.system(size: 12.5))
         }
         .foregroundStyle(Theme.secondaryText)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -131,7 +144,9 @@ struct DownloadsView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
                 ForEach(downloads.items) { item in
-                    DownloadTile(item: item, progress: downloads.progress[item.id], isSelected: selection.contains(item.id))
+                    DownloadTile(item: item, progress: downloads.progress[item.id], isSelected: selection.contains(item.id)) {
+                        downloads.cancel(item.id)
+                    }
                         .onTapGesture(count: 2) {
                             if let url = item.fileURL { NSWorkspace.shared.open(url) }
                         }
@@ -163,14 +178,17 @@ struct DownloadsView: View {
         }
         if item.status == .done, let url = item.fileURL {
             Button("Open") { NSWorkspace.shared.open(url) }
+            OpenWithMenu(file: url)
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
-        if item.status == .failed || item.status == .cancelled {
+        if (item.status == .failed || item.status == .cancelled) && item.canRetry {
             Button("Try Again") { downloads.retry(item.id) }
         }
-        Button("Copy Original Link") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(item.sourceURL, forType: .string)
+        if !item.sourceURL.isEmpty {
+            Button("Copy Original Link") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.sourceURL, forType: .string)
+            }
         }
         Divider()
         Button("Remove from List") { downloads.remove([item.id]) }
@@ -216,6 +234,8 @@ private struct DownloadTile: View {
     let item: DownloadService.Item
     let progress: DownloadService.Progress?
     let isSelected: Bool
+    let onCancel: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         VStack(spacing: 5) {
@@ -225,6 +245,20 @@ private struct DownloadTile: View {
                     .clipShape(RoundedRectangle(cornerRadius: 7))
                     .opacity(item.status == .done ? 1 : 0.55)
                 overlay
+            }
+            .overlay(alignment: .topTrailing) {
+                if item.isActive || item.status == .queued {
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 15))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .black.opacity(isHovered ? 0.85 : 0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 6, y: -6)
+                    .help("Cancel download")
+                    .accessibilityLabel("Cancel download")
+                }
             }
             Text(item.title)
                 .font(.system(size: 11))
@@ -241,6 +275,7 @@ private struct DownloadTile: View {
         .padding(.vertical, 7)
         .background(isSelected ? .white.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
         .help(item.errorMessage ?? item.sourceURL)
     }
 
@@ -260,7 +295,7 @@ private struct DownloadTile: View {
         case .cancelled:
             Image(systemName: "arrow.clockwise.circle.fill").font(.system(size: 20)).foregroundStyle(.white.opacity(0.7))
         case .done:
-            if item.quality == .audio {
+            if item.quality == .audio && !item.isFile {
                 Image(systemName: "music.note").font(.system(size: 16, weight: .semibold)).shadow(radius: 3)
             }
         }
@@ -270,7 +305,7 @@ private struct DownloadTile: View {
         switch item.status {
         case .queued: return "Waiting…"
         case .finishing: return "Finishing…"
-        case .cancelled: return "Cancelled · retry"
+        case .cancelled: return item.canRetry ? "Cancelled · retry" : "Cancelled"
         case .failed: return item.errorMessage ?? "Failed · retry"
         case .done:
             let size = (try? item.fileURL?.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 }
@@ -278,7 +313,12 @@ private struct DownloadTile: View {
         case .downloading:
             guard let progress else { return "Starting…" }
             var parts: [String] = []
-            if let f = progress.fraction { parts.append("\(Int(f * 100))%") }
+            if item.isFile, let bytes = progress.bytes {
+                let done = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+                parts.append(item.expectedBytes.map { "\(done) of \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))" } ?? done)
+            } else if let f = progress.fraction {
+                parts.append("\(Int(f * 100))%")
+            }
             if let eta = progress.eta, eta > 0 { parts.append(eta >= 60 ? "\(eta / 60)m left" : "\(eta)s left") }
             return parts.isEmpty ? "Downloading…" : parts.joined(separator: " · ")
         }
@@ -295,6 +335,11 @@ private struct Thumbnail: View {
             Color.white.opacity(0.08)
             if let fileThumbnail {
                 Image(nsImage: fileThumbnail).resizable().aspectRatio(contentMode: .fill)
+            } else if item.isFile {
+                Image(nsImage: Self.icon(for: item))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(5)
             } else if let string = item.thumbnailURL, let url = URL(string: string) {
                 AsyncImage(url: url) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
@@ -311,6 +356,30 @@ private struct Thumbnail: View {
             guard item.status == .done, let url = item.fileURL else { return }
             let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 72, height: 46), scale: 2, representationTypes: .thumbnail)
             fileThumbnail = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
+        }
+    }
+
+    /// The Finder icon for the file's type, while it downloads or when Quick Look has no preview.
+    static func icon(for item: DownloadService.Item) -> NSImage {
+        let ext = ((item.filePath ?? item.title) as NSString).pathExtension
+        return NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data)
+    }
+}
+
+/// "Open With" › the apps that can open this file, default first.
+private struct OpenWithMenu: View {
+    let file: URL
+
+    var body: some View {
+        let apps = NSWorkspace.shared.urlsForApplications(toOpen: file)
+        if !apps.isEmpty {
+            Menu("Open With") {
+                ForEach(apps.prefix(12), id: \.self) { app in
+                    Button(FileManager.default.displayName(atPath: app.path).replacingOccurrences(of: ".app", with: "")) {
+                        NSWorkspace.shared.open([file], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+                    }
+                }
+            }
         }
     }
 }

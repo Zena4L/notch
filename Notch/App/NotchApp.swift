@@ -21,6 +21,7 @@ struct NotchApp: App {
                 .environment(appDelegate.hotkeyStatus)
                 .environment(appDelegate.hud)
                 .environment(appDelegate.downloads)
+                .environment(appDelegate.browserBridge)
         }
     }
 }

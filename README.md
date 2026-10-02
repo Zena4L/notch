@@ -14,7 +14,7 @@ Built with SwiftUI and AppKit. Event-driven and lightweight: about **21 MB** of 
 | **Now Playing** | Album art, a waveform tinted by the artwork, a progress bar you can scrub, and playback controls. Works with Music, Spotify, browsers and Podcasts. |
 | **Lyrics** | Synced lyrics that follow the song (click a line to jump to it), from [LRCLIB](https://lrclib.net). Open them with the 💬 button in the player. |
 | **Timers** | Countdown and stopwatch, with a split bubble when two things are running at once. |
-| **Downloads** | Paste a link from X, YouTube or 1,000+ other sites to save the video or audio (via yt-dlp). Drag files out, AirDrop or share them. |
+| **Downloads** | Paste a link from X, YouTube or 1,000+ other sites to save the video or audio (via yt-dlp), or a link to any file. Downloads from Safari, Chrome, Brave, Edge and Arc show their progress in the notch automatically, and you can cancel them there. With the optional [browser extension](Extension/README.md), Notch does the downloading itself. Drag files out, AirDrop or share them. |
 | **Dashboard** | Widgets for CPU, memory, storage, network, battery, weather, today's events and clipboard history. |
 | **Calendar** | A reminder before meetings, with a **Join** button for Zoom, Google Meet and Teams links. |
 | **Volume & brightness** | Replaces the system overlay with one from the notch (optional). |
@@ -120,6 +120,28 @@ brew install yt-dlp ffmpeg
 Only download videos you have the right to keep. Some sites' terms, including YouTube's,
 restrict downloading.
 
+Links straight to a file (a PDF, a zip, a DMG…) don't need these tools.
+
+### Browser downloads
+
+There's nothing to set up: when you download something in Safari, Chrome, Brave, Edge or Arc,
+its progress shows in the notch, ✕ cancels it, and the finished file lands in the Downloads
+tab. Browsers publish their download progress to macOS, and Notch follows it for your Downloads
+folder. You can turn this off in **Settings › Activities › Browser downloads**.
+
+**Optional: let Notch do the downloading.** With the extension, Chrome, Edge, Brave, Arc or
+Firefox hand downloads over to Notch, which saves them itself:
+
+1. Turn on **Settings › Activities › Browser downloads › Take over downloads from your browser**,
+   and choose which file types Notch should take.
+2. Click **Show Extension Folder** and load it as an unpacked extension (`chrome://extensions` ›
+   Developer mode › Load unpacked; in Firefox, `about:debugging` › Load Temporary Add-on).
+
+If Notch isn't running, or can't fetch a file, the browser downloads it as usual. Notch
+listens on `127.0.0.1:47821` only, and accepts downloads only from the extension. Files are
+marked as downloaded from the internet, so macOS still checks apps and disk images.
+Safari isn't supported yet. See [Extension/README.md](Extension/README.md).
+
 ## Using Notch
 
 - **Hover** the notch to expand the island. Move away, or press **Esc**, to close it.
@@ -167,7 +189,9 @@ in place.
 - **Network** requests happen only for features you use:
   - lyrics: the song title and artist go to lrclib.net, when you open lyrics;
   - weather: the city or rounded location goes to Open-Meteo, when the dashboard opens;
-  - downloads: yt-dlp contacts the video's site.
+  - downloads: yt-dlp contacts the video's site; files go straight to the site they came from.
+- **Browser downloads**: the extension sends the file's link, name and your cookies for that
+  site to Notch on your own Mac (`127.0.0.1`). The cookies are kept in memory only.
 - **Clipboard history** is kept in memory only, and skips passwords from password managers.
 
 ## Development
@@ -184,6 +208,7 @@ xcodebuild -project Notch.xcodeproj -scheme Notch test
 | `Notch/Settings` | The Settings window and `SettingsStore` |
 | `Notch/Window` | The notch panel, hover zones, multi-display and full-screen handling |
 | `NotchTests` | Unit tests |
+| `Extension` | The browser extension that hands downloads over to Notch (Chromium and Firefox) |
 | `.github/workflows` | CI (tests on every push) and Release (DMG on every version tag) |
 | `Vendor/MediaRemoteAdapter` | Prebuilt helper for reading Now Playing on macOS 15.4+ |
 | `scripts/` | `install.sh` (the one-line installer), `release.sh` (builds the DMG), `make-icon.swift` (draws the app icon), `build-mediaremote-adapter.sh` (rebuilds the helper) |

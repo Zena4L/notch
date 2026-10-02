@@ -58,4 +58,5 @@ jobs:
           NOTES
           gh release create "$GITHUB_REF_NAME" \
             "build/release/Notch-$VERSION.dmg" "build/release/Notch-$VERSION.dmg.sha256" \
+            "build/release/Notch-Extension-$VERSION.zip" \
             --title "Notch $VERSION" --notes-file notes.md --generate-notes
